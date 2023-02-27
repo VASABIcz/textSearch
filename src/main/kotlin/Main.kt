@@ -130,19 +130,16 @@ interface INode {
 
     fun query(q: Item): List<Node> {
         val buf = mutableListOf<Node>()
-        println("aids ${q.root}")
         for (node in children) {
             val sim = node.value.similar(q.string())
             if (node.value.length == sim) {
                 val d = node.query(q.slice(node.value.length until q.length))
                 buf.addAll(d)
                 if (d.isEmpty()) {
-                    println("KYS")
                     buf.add(node)
                 }
             }
             else if ((sim > 1 || q.length == 0) && q.length < node.value.length) {
-                println("BYS")
                 buf.add(node)
             }
         }
