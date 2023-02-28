@@ -26,16 +26,17 @@ fun Item.normalize(): Item {
 }
 
 fun Item.simplify(): Item {
-    var buf = ""
-    for (c in this.string()) {
+    val res = this.string().mapNotNull { c ->
         if (c.isDigit() || c.isLetter()) {
-            buf += c
+            c
         }
         else if (c.isWhitespace()) {
-            buf += " "
+            " "
+        } else {
+            null
         }
     }
-    return Item.Modification(buf, this)
+    return Item.Modification(res.joinToString(""), this)
 }
 
 fun Item.lower(): Item {
@@ -112,6 +113,15 @@ sealed class Item {
             }
         }
 
+    val rootItem: Root
+        get() {
+            return when (this) {
+                is Root -> this
+                is Modification -> this.source.rootItem
+                is Slice -> this.source.rootItem
+            }
+        }
+
     override fun hashCode(): Int {
         return string().hashCode()
     }
@@ -129,21 +139,26 @@ interface INode {
     val children: MutableList<Node>
 
     fun query(q: Item): List<Node> {
-        val buf = mutableListOf<Node>()
-        for (node in children) {
-            val sim = node.value.similar(q.string())
-            if (node.value.length == sim) {
-                val d = node.query(q.slice(node.value.length until q.length))
-                buf.addAll(d)
-                if (d.isEmpty()) {
-                    buf.add(node)
+        val fullMatch = mutableListOf<Node>()
+        val partialMatch = mutableListOf<Node>()
+
+        for (c in children) {
+            val sim = c.value.similar(q.string())
+
+            if (sim == c.value.length) {
+                if (sim == q.length) {
+                    fullMatch.add(c)
                 }
+
+                val e = c.query(q.slice(sim until q.length))
+                fullMatch.addAll(e)
             }
-            else if ((sim > 1 || q.length == 0) && q.length < node.value.length) {
-                buf.add(node)
+            else if (sim == q.length) {
+                fullMatch.add(c)
             }
         }
-        return buf
+
+        return fullMatch.ifEmpty { partialMatch }
     }
 
     fun insert(value: Item) {
@@ -212,6 +227,17 @@ fun prepareStr(str: String): Set<Item> {
     return result
 }
 
+fun countItems(items: List<Item>): List<Item> {
+    val map = mutableMapOf<Item, Int>()
+
+    for (item in items) {
+        map.compute(item.rootItem) { it, value ->
+            (value ?: 0) + item.length
+        }
+    }
+
+    return map.map { it }.sortedByDescending { it.value }.map { it.key }
+}
 
 fun main(args: Array<String>) {
     val root = RootNode()
@@ -223,10 +249,11 @@ fun main(args: Array<String>) {
 
     while (true) {
         val l = readln()
-        prepareStr(l).forEach {
-            root.query(it).forEach {
-                println(it.value.root)
-            }
+        val res = prepareStr(l).flatMap {
+            root.query(it)
+        }
+        countItems(res.map { it.value }).forEach {
+            println(it.rootItem.string())
         }
     }
 }
