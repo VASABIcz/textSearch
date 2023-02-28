@@ -173,11 +173,9 @@ interface INode {
         }
 
         if (maxSim == null) {
-            // println("a $value")
             this.children.add(Node(value))
         }
         else {
-            // println("b $value")
             val node = children[maxSim!!.first]
 
             node.slice(maxSim!!.second)
